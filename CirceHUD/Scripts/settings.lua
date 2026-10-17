@@ -11,8 +11,13 @@ return {
     MinimumCameraAltitude = 50,
     Resolution = 512,
     RefreshMs = 750,
-    -- Unreal ESceneCaptureSource: 7 = unlit BaseColor (deferred rendering),
-    -- 2 = FinalColorLDR. Change to 2 if this game's renderer cannot show BaseColor.
-    CaptureSource = 7,
+    ArrowRefreshMs = 33,
+    ArrowSmoothing = 0.55,
+    -- Grading affects this map camera only. False restores the 0.1.2 colors.
+    DarkWater = true,
+    MapContrast = 1.35,
+    -- 3 = scene color with depth in alpha. The RGBA8 target clamps geometry
+    -- depth to opaque alpha, so Slate cannot discard otherwise visible terrain.
+    CaptureSource = 3,
     ShowNorth = true,
 }

@@ -16,6 +16,8 @@ local function release()
     if session.view then session.view:dispose() end
     if session.camera then session.camera:dispose() end
     session.view, session.camera, session.worldName, session.reported = nil, nil, nil, nil
+    session.bearing = nil
+    session.arrowError = nil
 end
 
 local function update()
@@ -42,12 +44,26 @@ local function update()
     if session.layoutDirty then session.view:layout(Config, session.large); session.layoutDirty = false end
     session.camera:refresh(player, Config, session.range)
     local region, time = Engine.labels(player)
-    session.view:update(region, time, player.yaw)
+    session.view:update(region, time)
+    if not session.bearing then
+        session.bearing = Model.heading(player.yaw)
+        session.view:heading(session.bearing)
+    end
     if not session.reported then
-        print(("[CirceHUD] First frame: source=%d, region=%s, time=%s\n"):format(Config.CaptureSource, region, time))
+        print(("[CirceHUD] First frame: source=%d, region=%s, time=%s, viewYaw=%.1f, bearing=%.1f\n")
+            :format(session.camera.source or Config.CaptureSource, region, time, player.yaw, Model.heading(player.yaw)))
         session.reported = true
     end
     report("Live camera and HUD active; region/time queries completed")
+end
+
+local function updateArrow()
+    if session.transition or session.reset or not session.visible or not session.view then return end
+    if not session.view:valid() then return end
+    local yaw = Engine.yaw()
+    if not Model.finite(yaw) then return end
+    session.bearing = Model.smoothHeading(session.bearing, Model.heading(yaw), Config.ArrowSmoothing)
+    session.view:heading(session.bearing)
 end
 
 local function safelyUpdate()
@@ -68,7 +84,7 @@ local function bind(key, modifiers, callback)
     if not ok then report("Hotkey registration failed: " .. tostring(err)) end
 end
 
-bind(Key.H, { ModifierKey.CONTROL }, function() session.visible = not session.visible end)
+bind(Key.F3, {}, function() session.visible = not session.visible end)
 bind(Key.M, {}, function()
     session.large = not session.large
     session.visible = true
@@ -101,5 +117,18 @@ local function schedule()
         end)
     end)
 end
-report("Standalone build 0.1.0-alpha loaded")
+local function scheduleArrow()
+    ExecuteWithDelay(Config.ArrowRefreshMs, function()
+        ExecuteInGameThread(function()
+            local ok, err = pcall(updateArrow)
+            if not ok and not session.arrowError then
+                session.arrowError = true
+                report("Arrow update unavailable: " .. tostring(err))
+            end
+            scheduleArrow()
+        end)
+    end)
+end
+report("Standalone build 0.1.3-alpha loaded")
 schedule()
+scheduleArrow()

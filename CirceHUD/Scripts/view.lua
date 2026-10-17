@@ -41,6 +41,7 @@ function View.new(host, outer, world, target, config, directory)
         self.slot = place(host, self.root, config.Left, config.Top, config.Diameter, config.Diameter + 64, 9000)
         self.map = widget("Image", outer)
         self.map:SetBrushResourceObject(target)
+        self.map:SetColorAndOpacity({ R = 1, G = 1, B = 1, A = 1 })
         self.mapSlot = place(self.root, self.map, 0, 0, config.Diameter, config.Diameter, 0)
         self.marker = widget("Image", outer)
         local renderer = E.lookup("/Script/Engine.Default__KismetRenderingLibrary")
@@ -71,6 +72,8 @@ function View:layout(config, large)
     -- outline. Four half-width radii produce a circle without strip clipping.
     local brush = self.map.Brush
     brush.DrawAs = 4 -- ESlateBrushDrawType::RoundedBox
+    brush.ImageType = 1 -- FullColor
+    brush.TintColor = tint(1, 1, 1)
     brush.ImageSize = vector(d, d)
     local outline = brush.OutlineSettings
     outline.RoundingType = 0 -- FixedRadius
@@ -86,10 +89,13 @@ function View:layout(config, large)
     self.northSlot:SetPosition(vector(d / 2 - 12, 5))
 end
 
-function View:update(region, clock, yaw)
+function View:update(region, clock)
     if self.lastRegion ~= region then self.region:SetText(FText(region)); self.lastRegion = region end
     if self.lastClock ~= clock then self.clock:SetText(FText(clock)); self.lastClock = clock end
-    self.marker:SetRenderTransformAngle(yaw)
+end
+
+function View:heading(bearing)
+    self.marker:SetRenderTransformAngle(bearing)
 end
 
 function View:visible(visible) self.root:SetVisibility(visible and 3 or 1) end

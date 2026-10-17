@@ -36,6 +36,27 @@ function M.camera(location, config)
     }
 end
 
+function M.fov(height, width)
+    return M.clamp(math.deg(2 * math.atan(width / (2 * math.max(height, 1)))), 5, 150)
+end
+
+-- Subnautica's map north is -Y; Unreal yaw zero points along +X (east).
+-- The generated pointer points up, so east requires a 90-degree UI rotation.
+function M.heading(yaw)
+    return (yaw + 90) % 360
+end
+
+function M.smoothHeading(current, target, amount)
+    if not M.finite(target) then return current end
+    if not M.finite(current) then return target % 360 end
+    local difference = (target - current + 180) % 360 - 180
+    return (current + difference * M.clamp(amount, 0, 1)) % 360
+end
+
+function M.mapRotation()
+    return { Pitch = -90, Yaw = -90, Roll = 0 }
+end
+
 function M.options(input)
     local c = {}
     local function number(name, fallback, low, high)
@@ -53,8 +74,12 @@ function M.options(input)
     number("MinimumCameraAltitude", 50, -1000, 1000)
     number("Resolution", 512, 128, 1024)
     number("RefreshMs", 750, 250, 5000)
+    number("ArrowRefreshMs", 33, 16, 100)
+    number("ArrowSmoothing", 0.55, 0.1, 1)
+    number("MapContrast", 1.35, 1, 2)
+    c.DarkWater = input.DarkWater ~= false
     c.Resolution = math.floor(c.Resolution)
-    c.CaptureSource = input.CaptureSource == 2 and 2 or 7
+    c.CaptureSource = (input.CaptureSource == 2 or input.CaptureSource == 7) and input.CaptureSource or 3
     c.ShowNorth = input.ShowNorth ~= false
     return c
 end

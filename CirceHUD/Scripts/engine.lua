@@ -12,6 +12,22 @@ function E.lookup(path)
     return object
 end
 
+function E.yaw(controller)
+    controller = controller or Helpers.GetPlayerController()
+    if not E.valid(controller) then return nil end
+    -- The compass tracks where the view faces. A swimming pawn's body can
+    -- lag behind the view, so prefer the actual camera, then controller aim.
+    local ok, rotation = pcall(function()
+        local camera = controller.PlayerCameraManager
+        if E.valid(camera) then return camera:GetCameraRotation() end
+        return controller:GetControlRotation()
+    end)
+    if not ok or not rotation or not Model.finite(rotation.Yaw) then
+        rotation = controller:GetControlRotation()
+    end
+    return rotation.Yaw
+end
+
 function E.player()
     local world = Helpers.GetWorld()
     local controller = Helpers.GetPlayerController()
@@ -19,8 +35,7 @@ function E.player()
     local pawn = controller:K2_GetPawn()
     if not E.valid(pawn) then return nil end
     local location = pawn:K2_GetActorLocation()
-    local rotation = pawn:K2_GetActorRotation()
-    return { world = world, pawn = pawn, location = location, yaw = rotation.Yaw }
+    return { world = world, pawn = pawn, location = location, yaw = E.yaw(controller) }
 end
 
 function E.labels(player)

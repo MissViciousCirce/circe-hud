@@ -5,7 +5,7 @@ import json
 import zipfile
 
 root = Path(__file__).resolve().parents[1]
-version = "0.1.0-alpha"
+version = "0.1.3-alpha"
 payload = root / "CirceHUD"
 files = [{"Path": p.relative_to(payload).as_posix(),
           "SHA256": hashlib.sha256(p.read_bytes()).hexdigest().upper()}
