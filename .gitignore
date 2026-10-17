@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+*.log
+*.dmp
+*.zip
+.venv/
+backups/
