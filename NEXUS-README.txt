@@ -1,5 +1,5 @@
-Circe's Circular Minimap - Region & Clock
-Version 0.1.4-alpha (toggle fix awaiting in-game validation)
+Circe's Circular Minimap - Region and Clock
+Version 0.1.4-alpha
 
 A smooth circular minimap with region names and a 12-hour in-game clock.
 Press F3 to show or hide it.
@@ -7,8 +7,8 @@ Press F3 to show or hide it.
 REQUIREMENTS
 Subnautica 2 for Windows and a compatible UE4SS installation with UEHelpers
 and LoopInGameThreadWithDelay support.
-The visual baseline was tested locally on Steam. This toggle fix still needs
-in-game verification. Other storefronts and multiplayer are untested.
+Tested locally on Windows/Steam, including repeated F3 toggles and Quick Stack
+working afterward. Other storefronts and multiplayer are untested.
 
 VORTEX
 Install the Subnautica 2 game-support extension and UE4SS first.

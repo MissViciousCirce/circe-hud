@@ -1,10 +1,10 @@
-# Circe's Circular Minimap - Region & Clock
+# Circe's Circular Minimap - Region and Clock
 
 A smooth circular minimap with region names and a 12-hour in-game clock. Press F3 to show or hide it.
 
 Created for **MissViciousCirce** with code generated and refined using OpenAI Codex. The internal mod folder remains `CirceHUD` for update compatibility.
 
-**0.1.4-alpha - toggle recovery fix; automated checks pass, in-game validation pending. Publication is on hold.**
+**0.1.4-alpha - confirmed working in-game on Windows/Steam on 17 October 2026.**
 
 ## What it does
 
@@ -63,9 +63,9 @@ Regions may read **Unknown region** above water because the game does not supply
 
 Native function names and relevant parameter signatures were checked against the installed game. Automated checks cover Lua syntax, clock boundaries, region formatting, option validation and camera positioning. Engine calls are tested with mocks; those do not prove correct rendering inside Unreal.
 
-Version 0.1.3's visuals were confirmed in-game, but repeated F3 toggles subsequently caused the HUD to stop returning. The log recorded a UE4SS wrapper error followed by an EngineTick callback exception and hook removal. The same session's Mod Settings control queue stopped draining; Quick Stack also stopped responding. These symptoms require a full game restart before retesting.
+Version 0.1.4 uses one persistent game-thread timer. Key callbacks enqueue commands, which that timer applies in order. Stale wrapper validation and cleanup are protected so a recoverable widget error cannot terminate updates. Fourteen automated tests cover the original clock, compass and rendering calculations plus 50 hide/show cycles, rapid ordered key bursts, hidden map transitions, and recovery after both widget validation and disposal throw. These tests use mocks and do not replace live validation.
 
-Version 0.1.4 replaces the two asynchronous scheduling chains and per-key game-thread dispatch with one persistent game-thread timer. Key callbacks only enqueue plain Lua commands, which that timer applies in order. Stale wrapper validation and cleanup are protected so a recoverable widget error cannot terminate updates. Fourteen automated tests cover the original clock, compass and rendering calculations plus 50 hide/show cycles, rapid ordered key bursts, hidden map transitions, and recovery after both widget validation and disposal throw. These tests use mocks; they do not reproduce UE4SS's native threading behavior or replace live validation. Repeated F3 toggles, the Mod Settings controls and Quick Stack N still need a fresh-session check before publication.
+The tester confirmed the fresh-session checks passed after the fix. Runtime logs record 20 applied toggle commands, the HUD returning to visible, and successful Quick Stack transfers afterward without the earlier EngineTick callback failure. Terrain visibility, region/time, compass alignment and pointer smoothing have also been checked in-game.
 
 This remains an alpha release. Live Vortex install/update/uninstall testing and broader hardware/game-build testing are pending. Runtime diagnostics start with `[CirceHUD]` in `ue4ss/UE4SS.log`. No analytics or network requests are made by this mod.
 
