@@ -96,66 +96,155 @@ package.preload.UEHelpers=function() return {
         lua.execute("controller.PlayerCameraManager=nil")
         self.assertEqual(engine.player().yaw, -90)
 
-    def test_main_loop_stationary_hide_and_reload(self):
+    def lifecycle(self):
         lua = self.lua
         lua.globals().modelModule = self.model
         lua.execute('''
+
 package.preload.model=function() return modelModule end
 package.preload.settings=function() return {} end
 playerAvailable=true; captureCount=0; cameraCount=0; disposed=0; labelCount=0
-viewYaw=90; arrowCount=0; yawReads=0
+viewYaw=90; arrowCount=0; yawReads=0; context="startup"; loopCount=0
+function native() assert(context=="game", "native work outside the game loop") end
 package.preload.engine=function() return {
- yaw=function() yawReads=yawReads+1; return viewYaw end,
+ yaw=function() native(); yawReads=yawReads+1; return viewYaw end,
  player=function()
+  native()
   if not playerAvailable then return nil end
   return {world={GetFullName=function() return "TestWorld" end},location={X=0,Y=0,Z=0},yaw=90}
  end,
- hud=function() return {},{} end,
- labels=function() labelCount=labelCount+1; return "Shallows", "12:00 PM" end
+ hud=function() native(); return {},{} end,
+ labels=function() native(); labelCount=labelCount+1; return "Shallows", "12:00 PM" end
 } end
 package.preload.capture=function() return {new=function()
- cameraCount=cameraCount+1
- return {texture={},valid=function() return true end,
- refresh=function() captureCount=captureCount+1 end,
- dispose=function() disposed=disposed+1 end}
+ native(); cameraCount=cameraCount+1
+ return {texture={},valid=function() native(); return true end,
+ refresh=function() native(); captureCount=captureCount+1 end,
+ dispose=function() native(); disposed=disposed+1 end}
 end} end
 package.preload.view=function() return {new=function()
- return {valid=function() return true end,visible=function(_,v) shown=v end,
- layout=function() end,update=function(_,r,t) assert(t=="12:00 PM") end,
- heading=function(_,bearing) arrowCount=arrowCount+1; lastHeading=bearing end,
- dispose=function() end}
+ native()
+ local view={broken=false,failDispose=false}
+ currentView=view
+ function view:valid()
+  native()
+  if self.broken then error("System: Global for __index doesn't exist.") end
+  return true
+ end
+ function view:visible(v) native(); shown=v end
+ function view:layout() native() end
+ function view:update(r,t) native(); assert(t=="12:00 PM") end
+ function view:heading(bearing) native(); arrowCount=arrowCount+1; lastHeading=bearing end
+ function view:dispose() native(); if self.failDispose then error("stale cleanup") end end
+ return view
 end} end
 Key={F3=1,M=2,ADD=3,SUBTRACT=4};bindings={}
 function RegisterKeyBind(key,mods,fn) bindings[key]=fn end
-function ExecuteInGameThread(fn) fn() end
-function ExecuteWithDelay(ms,fn) if ms==33 then arrowPending=fn else pending=fn end end
+function ExecuteInGameThread() error("must not queue cross-thread work") end
+function ExecuteWithDelay() error("must not create asynchronous timers") end
+function LoopInGameThreadWithDelay(ms,fn)
+ assert(context=="startup" and ms==33)
+ loopCount=loopCount+1; timer=fn
+end
 function RegisterLoadMapPreHook(fn) pre=fn end
 function RegisterLoadMapPostHook(fn) post=fn end
 function RegisterHook(_,fn) restart=fn end
 function print(_) end
+function step(n)
+ context="game"; for i=1,n or 1 do timer() end; context="idle"
+end
+function press(key)
+ context="key"; bindings[key](); context="idle"
+end
 ''')
         loader = lua.eval('function(s) assert(load(s,"@CirceHUD/Scripts/main.lua"))() end')
         loader((SCRIPTS / "main.lua").read_text())
-        lua.execute("pending(); pending(); pending()")
+        return lua
+
+    def test_main_loop_stationary_hide_and_reload(self):
+        lua = self.lifecycle()
+        lua.execute("step(47)")
+        self.assertEqual(lua.globals().loopCount, 1)
         self.assertEqual(lua.globals().cameraCount, 1)
         self.assertEqual(lua.globals().captureCount, 3)
         self.assertEqual(lua.globals().labelCount, 3)
-        lua.execute("viewYaw=100; for i=1,10 do arrowPending() end")
+        lua.execute("viewYaw=100; step(10)")
         self.assertEqual(lua.globals().captureCount, 3)
         self.assertEqual(lua.globals().labelCount, 3)
-        self.assertEqual(lua.globals().arrowCount, 11)
         self.assertAlmostEqual(lua.globals().lastHeading, 190, places=2)
-        lua.execute("bindings[Key.F3](); pending()")
+        reads = lua.globals().yawReads
+        lua.execute("press(Key.F3); step(30)")
         self.assertEqual(lua.globals().captureCount, 3)
         self.assertFalse(lua.globals().shown)
-        lua.execute("for i=1,10 do arrowPending() end")
-        self.assertEqual(lua.globals().yawReads, 10)
-        lua.execute("bindings[Key.F3](); pre(); pending()")
+        self.assertEqual(lua.globals().yawReads, reads)
+        lua.execute("press(Key.F3); pre(); step()")
         self.assertEqual(lua.globals().disposed, 1)
-        lua.execute("post(); pending()")
+        lua.execute("post(); step()")
         self.assertEqual(lua.globals().cameraCount, 2)
-        lua.execute("playerAvailable=false; pending()")
+        lua.execute("playerAvailable=false; step(23)")
         self.assertEqual(lua.globals().disposed, 2)
+
+    def test_fifty_hide_show_cycles_and_ordered_burst(self):
+        lua = self.lifecycle()
+        lua.execute('''
+
+step()
+for i=1,50 do
+ local captures=captureCount
+ press(Key.F3)
+ assert(shown, "key callback must only enqueue a command")
+ step(24)
+ assert(not shown and captureCount==captures)
+ press(Key.F3); step()
+ assert(shown and captureCount==captures+1)
+end
+-- Two toggles before a tick cancel each other. M then F3 must end hidden;
+-- reversing that order must end visible, without leaking extra cameras.
+press(Key.F3); press(Key.F3); step(); assert(shown)
+press(Key.M); press(Key.F3); step(); assert(not shown)
+press(Key.F3); press(Key.M); step(); assert(shown)
+assert(cameraCount==1 and loopCount==1)
+''')
+
+    def test_stale_widget_and_failed_cleanup_do_not_stop_timer(self):
+        lua = self.lifecycle()
+        lua.execute('''
+
+step(); press(Key.F3); step()
+currentView.broken=true; currentView.failDispose=true
+press(Key.F3); step() -- invalid wrapper and failing cleanup on show
+assert(disposed==1)
+step(23*9)
+assert(cameraCount==2 and shown)
+press(Key.F3); step(); assert(not shown)
+press(Key.F3); step(); assert(shown)
+assert(loopCount==1)
+''')
+
+    def test_transition_cleanup_is_deferred_and_keeps_hidden_preference(self):
+        lua = self.lifecycle()
+        lua.execute('''
+
+step(); press(Key.F3); step()
+pre(); assert(disposed==0)
+step(); assert(disposed==1)
+post(); step(30); assert(cameraCount==1 and not shown)
+press(Key.F3); step(); assert(cameraCount==2 and shown)
+''')
+
+    def test_validity_handles_dead_ue4ss_wrapper(self):
+        lua = self.lua
+        lua.globals().modelModule = self.model
+        lua.execute('''
+
+package.preload.model=function() return modelModule end
+package.preload.UEHelpers=function() return {} end
+dead=setmetatable({}, {__index=function() error("System: Global for __index doesn't exist.") end})
+''')
+        engine = lua.execute((SCRIPTS / "engine.lua").read_text())
+        self.assertFalse(engine.valid(lua.globals().dead))
+        self.assertFalse(engine.valid(None))
+        self.assertTrue(engine.valid(lua.eval('{IsValid=function() return true end}')))
 
 
 if __name__ == "__main__":

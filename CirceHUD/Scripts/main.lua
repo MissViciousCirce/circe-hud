@@ -5,7 +5,10 @@ local Engine = require("engine")
 local Capture = require("capture")
 local View = require("view")
 local directory = assert(debug.getinfo(1, "S").source:match("^@(.+[/\\])"), "Cannot locate CirceHUD scripts")
-local session = { visible = true, large = false, range = Config.Range, queued = false, transition = false }
+local session = { visible = true, large = false, range = Config.Range, transition = false }
+-- Key callbacks run on UE4SS's event thread. Publish only plain Lua commands;
+-- never dispatch native callbacks or touch widget wrappers from that thread.
+local commands, written, consumed = {}, 0, 0
 local lastMessage
 
 local function report(message)
@@ -13,25 +16,27 @@ local function report(message)
 end
 
 local function release()
-    if session.view then session.view:dispose() end
-    if session.camera then session.camera:dispose() end
+    local view, camera = session.view, session.camera
     session.view, session.camera, session.worldName, session.reported = nil, nil, nil, nil
     session.bearing = nil
     session.arrowError = nil
+    -- Cleanup must not throw out of the recovery path and kill the update loop.
+    if view then pcall(function() view:dispose() end) end
+    if camera then pcall(function() camera:dispose() end) end
 end
 
 local function update()
-    if session.transition then return end
-    if session.skipTicks and session.skipTicks > 0 then session.skipTicks = session.skipTicks - 1; return end
     if session.reset then release(); session.reset = false end
+    if session.transition then return end
     if not session.visible then
         if session.view and session.view:valid() then session.view:visible(false) end
         return
     end
+    if session.skipTicks and session.skipTicks > 0 then session.skipTicks = session.skipTicks - 1; return end
     local player = Engine.player()
     if not player then release(); return end
     if session.worldName and session.worldName ~= player.world:GetFullName() then release() end
-    if session.view and (not session.view:valid() or not session.camera:valid()) then release() end
+    if session.view and (not session.view:valid() or not session.camera or not session.camera:valid()) then release() end
     if not session.view then
         local host, outer = Engine.hud()
         if not host then report("Waiting for the game HUD"); return end
@@ -75,28 +80,50 @@ local function safelyUpdate()
     end
 end
 
-local function bind(key, modifiers, callback)
+local function bind(key, command)
     local ok, err = pcall(function()
-        RegisterKeyBind(key, modifiers, function()
-            ExecuteInGameThread(function() callback(); safelyUpdate() end)
+        RegisterKeyBind(key, {}, function()
+            local nextIndex = written + 1
+            commands[nextIndex] = command
+            written = nextIndex
         end)
     end)
     if not ok then report("Hotkey registration failed: " .. tostring(err)) end
 end
 
-bind(Key.F3, {}, function() session.visible = not session.visible end)
-bind(Key.M, {}, function()
-    session.large = not session.large
-    session.visible = true
-    session.layoutDirty = true
-end)
-bind(Key.ADD, {}, function() session.range = Model.clamp(session.range / 1.25, Config.MinRange, Config.MaxRange) end)
-bind(Key.SUBTRACT, {}, function() session.range = Model.clamp(session.range * 1.25, Config.MinRange, Config.MaxRange) end)
+bind(Key.F3, "toggle")
+bind(Key.M, "enlarge")
+bind(Key.ADD, "zoomIn")
+bind(Key.SUBTRACT, "zoomOut")
 
--- Hook callbacks only adjust lifecycle state; all regular object access is
--- scheduled on the game thread. The validity checks also cover missed hooks.
+local function drainCommands()
+    local limit = written
+    if consumed == limit then return false end
+    while consumed < limit do
+        consumed = consumed + 1
+        local command = commands[consumed]
+        commands[consumed] = nil
+        if command == "toggle" then
+            session.visible = not session.visible
+        elseif command == "enlarge" then
+            session.large = not session.large
+            session.visible = true
+            session.layoutDirty = true
+        elseif command == "zoomIn" then
+            session.range = Model.clamp(session.range / 1.25, Config.MinRange, Config.MaxRange)
+        elseif command == "zoomOut" then
+            session.range = Model.clamp(session.range * 1.25, Config.MinRange, Config.MaxRange)
+        end
+    end
+    session.skipTicks = 0 -- An explicit show request may retry immediately.
+    print(("[CirceHUD] Controls applied through #%d; HUD %s\n"):format(consumed, session.visible and "shown" or "hidden"))
+    return true
+end
+
+-- Hooks only adjust lifecycle state. Native cleanup happens in the same loop
+-- as rendering, including when the HUD is hidden during a map transition.
 pcall(function()
-    RegisterLoadMapPreHook(function() session.transition = true; release() end)
+    RegisterLoadMapPreHook(function() session.transition = true; session.reset = true end)
     RegisterLoadMapPostHook(function() session.transition = false; session.reset = true end)
 end)
 pcall(function()
@@ -106,29 +133,35 @@ pcall(function()
     end)
 end)
 
-local function schedule()
-    ExecuteWithDelay(Config.RefreshMs, function()
-        if session.queued then return end
-        session.queued = true
-        ExecuteInGameThread(function()
-            session.queued = false
-            safelyUpdate()
-            schedule()
-        end)
-    end)
+local elapsed = Config.RefreshMs
+local function tick()
+    local changed = drainCommands()
+    elapsed = elapsed + Config.ArrowRefreshMs
+    if changed or session.reset or elapsed >= Config.RefreshMs then
+        elapsed = 0
+        safelyUpdate()
+    end
+    local ok, err = pcall(updateArrow)
+    if not ok then
+        -- Rebuild on the next terrain tick instead of retaining broken widgets.
+        session.reset = true
+        report("Rebuilding HUD after arrow error: " .. tostring(err))
+    end
 end
-local function scheduleArrow()
-    ExecuteWithDelay(Config.ArrowRefreshMs, function()
-        ExecuteInGameThread(function()
-            local ok, err = pcall(updateArrow)
-            if not ok and not session.arrowError then
-                session.arrowError = true
-                report("Arrow update unavailable: " .. tostring(err))
-            end
-            scheduleArrow()
-        end)
+
+report("Standalone build 0.1.4-alpha loaded")
+-- One persistent native timer; no recurring asynchronous callback creation or
+-- key-driven ExecuteInGameThread calls that can race the UE4SS Lua registry.
+if type(LoopInGameThreadWithDelay) == "function" then
+    LoopInGameThreadWithDelay(Config.ArrowRefreshMs, function()
+        local ok, err = pcall(tick)
+        if not ok then
+            release()
+            session.skipTicks = 8
+            report("Recovered update error: " .. tostring(err))
+        end
     end)
+    report("Single game-thread update loop ready; F3 toggles HUD")
+else
+    report("This UE4SS build is missing LoopInGameThreadWithDelay; update UE4SS for Subnautica 2")
 end
-report("Standalone build 0.1.3-alpha loaded")
-schedule()
-scheduleArrow()

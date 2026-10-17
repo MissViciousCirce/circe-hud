@@ -3,7 +3,10 @@ local Model = require("model")
 local E = {}
 
 function E.valid(object)
-    return object ~= nil and object:IsValid()
+    if object == nil then return false end
+    -- A stale UE4SS wrapper can throw even while resolving IsValid itself.
+    local ok, valid = pcall(function() return object:IsValid() end)
+    return ok and valid == true
 end
 
 function E.lookup(path)

@@ -1,5 +1,5 @@
 {
-  "Version": "0.1.3-alpha",
+  "Version": "0.1.4-alpha",
   "Files": [
     {
       "Path": "Assets/pointer.png.lua",
@@ -15,11 +15,11 @@
     },
     {
       "Path": "Scripts/engine.lua",
-      "SHA256": "ED50AA6961085B3A3C620402B10C7C9B9DBEE24C3097D15DEE4FD79A48974882"
+      "SHA256": "427A86122EC2D78443841D402A10ADD6CA61815247F37CE1642CE505CBD87F53"
     },
     {
       "Path": "Scripts/main.lua",
-      "SHA256": "015090941A8F238EE6A8A3B885CF8B8D0039C0FDFB20AEDDBB1C4090A92323A2"
+      "SHA256": "D7E69B2CC17C31FCEFEAA9EBD4640567DD2599E06D8EC9E8C6F015CCE40C774D"
     },
     {
       "Path": "Scripts/model.lua",
