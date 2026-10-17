@@ -45,9 +45,7 @@ Save and close the game. In Vortex, disable/remove CirceHUD and deploy.
 For a manual install, remove only Mods/CirceHUD. If you added a CirceHUD line
 to mods.txt manually, remove that line or set it to 0.
 
-CREDITS AND LICENSE
-Created for MissViciousCirce with code generated and refined using OpenAI Codex.
-Original Lua code and generated pointer artwork; no bundled world-map imagery.
+LICENSE
 MIT license: see LICENSE.txt.
 Source: https://github.com/MissViciousCirce/circe-hud
 Unofficial fan mod, not affiliated with Unknown Worlds.
