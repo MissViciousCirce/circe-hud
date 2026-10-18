@@ -78,6 +78,7 @@ function M.options(input)
     number("ArrowSmoothing", 0.55, 0.1, 1)
     number("MapContrast", 1.35, 1, 2)
     c.DarkWater = input.DarkWater ~= false
+    c.Diagnostics = input.Diagnostics == true
     c.Resolution = math.floor(c.Resolution)
     c.CaptureSource = (input.CaptureSource == 2 or input.CaptureSource == 7) and input.CaptureSource or 3
     c.ShowNorth = input.ShowNorth ~= false

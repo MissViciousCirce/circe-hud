@@ -5,7 +5,7 @@ import json
 import zipfile
 
 root = Path(__file__).resolve().parents[1]
-version = "0.1.4-alpha"
+version = "0.1.5-alpha"
 payload = root / "CirceHUD"
 files = [{"Path": p.relative_to(payload).as_posix(),
           "SHA256": hashlib.sha256(p.read_bytes()).hexdigest().upper()}
@@ -13,7 +13,7 @@ files = [{"Path": p.relative_to(payload).as_posix(),
 (root / "manifest.json").write_bytes((json.dumps({"Version": version, "Files": files}, indent=2) + "\n").encode())
 archive = root.parent / ("CirceHUD-" + version + ".zip")
 allowed_roots = {"CirceHUD", "tools", "tests"}
-allowed_files = {"README.md", "NEXUS-README.txt", "LICENSE", "Install.ps1", "manifest.json", ".gitignore", ".gitattributes"}
+allowed_files = {"README.md", "NEXUS-README.txt", "CHANGELOG.md", "LICENSE", "Install.ps1", "manifest.json", ".gitignore", ".gitattributes"}
 with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as z:
     for path in sorted(root.rglob("*")):
         rel = path.relative_to(root)

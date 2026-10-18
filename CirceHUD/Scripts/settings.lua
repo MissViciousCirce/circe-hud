@@ -13,6 +13,8 @@ return {
     RefreshMs = 750,
     ArrowRefreshMs = 33,
     ArrowSmoothing = 0.55,
+    -- Enable only when collecting camera/pixel diagnostics for a bug report.
+    Diagnostics = false,
     -- Grading affects this map camera only. False restores the 0.1.2 colors.
     DarkWater = true,
     MapContrast = 1.35,

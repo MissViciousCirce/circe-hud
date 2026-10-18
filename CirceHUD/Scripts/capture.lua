@@ -94,7 +94,8 @@ function Capture:refresh(player, config, range)
     self.component:K2_SetWorldRotation(Model.mapRotation(), false, {}, true)
     self.component:CaptureScene()
     self.frames = (self.frames or 0) + 1
-    if self.frames == 6 then
+    -- Pixel readback can stall rendering. Keep it opt-in for troubleshooting.
+    if config.Diagnostics and self.frames == 6 then
         self.sampledSource = self.source
         local ok, result = pcall(function()
             local p = self.component:K2_GetComponentLocation()

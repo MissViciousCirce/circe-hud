@@ -19,6 +19,7 @@ local function release()
     local view, camera = session.view, session.camera
     session.view, session.camera, session.worldName, session.reported = nil, nil, nil, nil
     session.bearing = nil
+    session.controller = nil
     session.arrowError = nil
     -- Cleanup must not throw out of the recovery path and kill the update loop.
     if view then pcall(function() view:dispose() end) end
@@ -45,6 +46,8 @@ local function update()
         session.view = View.new(host, outer, player.world, session.camera.texture, Config, directory)
         session.layoutDirty = true
     end
+    -- Refresh the controller with the player snapshot, not on every arrow tick.
+    session.controller = player.controller
     session.view:visible(true)
     if session.layoutDirty then session.view:layout(Config, session.large); session.layoutDirty = false end
     session.camera:refresh(player, Config, session.range)
@@ -65,7 +68,8 @@ end
 local function updateArrow()
     if session.transition or session.reset or not session.visible or not session.view then return end
     if not session.view:valid() then return end
-    local yaw = Engine.yaw()
+    if not Engine.valid(session.controller) then return end
+    local yaw = Engine.yaw(session.controller)
     if not Model.finite(yaw) then return end
     session.bearing = Model.smoothHeading(session.bearing, Model.heading(yaw), Config.ArrowSmoothing)
     session.view:heading(session.bearing)
@@ -149,7 +153,7 @@ local function tick()
     end
 end
 
-report("Standalone build 0.1.4-alpha loaded")
+report("Standalone build 0.1.5-alpha loaded")
 -- One persistent native timer; no recurring asynchronous callback creation or
 -- key-driven ExecuteInGameThread calls that can race the UE4SS Lua registry.
 if type(LoopInGameThreadWithDelay) == "function" then

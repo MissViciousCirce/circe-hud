@@ -32,13 +32,16 @@ function E.yaw(controller)
 end
 
 function E.player()
-    local world = Helpers.GetWorld()
     local controller = Helpers.GetPlayerController()
-    if not E.valid(world) or not E.valid(controller) then return nil end
+    if not E.valid(controller) then return nil end
+    -- UEHelpers.GetWorld() repeats the global controller search. Use the
+    -- controller already found on this slower player/terrain update instead.
+    local world = controller:GetWorld()
+    if not E.valid(world) then return nil end
     local pawn = controller:K2_GetPawn()
     if not E.valid(pawn) then return nil end
     local location = pawn:K2_GetActorLocation()
-    return { world = world, pawn = pawn, location = location, yaw = E.yaw(controller) }
+    return { world = world, controller = controller, pawn = pawn, location = location, yaw = E.yaw(controller) }
 end
 
 function E.labels(player)

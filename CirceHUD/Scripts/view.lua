@@ -95,7 +95,11 @@ function View:update(region, clock)
 end
 
 function View:heading(bearing)
+    -- Compare against the last displayed angle, so small movements accumulate
+    -- without invalidating the widget on every stationary smoothing tick.
+    if self.lastBearing and math.abs((bearing - self.lastBearing + 180) % 360 - 180) < 0.1 then return end
     self.marker:SetRenderTransformAngle(bearing)
+    self.lastBearing = bearing
 end
 
 function View:visible(visible) self.root:SetVisibility(visible and 3 or 1) end

@@ -86,7 +86,8 @@ function valid() return true end
 camera={IsValid=valid,GetCameraRotation=function() return {Yaw=60} end}
 pawn={IsValid=valid,K2_GetActorLocation=function() return {X=0,Y=0,Z=0} end}
 controller={IsValid=valid,PlayerCameraManager=camera,
- K2_GetPawn=function() return pawn end,GetControlRotation=function() return {Yaw=-90} end}
+ K2_GetPawn=function() return pawn end,GetControlRotation=function() return {Yaw=-90} end,
+ GetWorld=function() return {IsValid=valid} end}
 package.preload.UEHelpers=function() return {
  GetWorld=function() return {IsValid=valid} end,
  GetPlayerController=function() return controller end} end
@@ -105,13 +106,15 @@ package.preload.model=function() return modelModule end
 package.preload.settings=function() return {} end
 playerAvailable=true; captureCount=0; cameraCount=0; disposed=0; labelCount=0
 viewYaw=90; arrowCount=0; yawReads=0; context="startup"; loopCount=0
+currentController={}
 function native() assert(context=="game", "native work outside the game loop") end
 package.preload.engine=function() return {
- yaw=function() native(); yawReads=yawReads+1; return viewYaw end,
+ valid=function(object) native(); return object==currentController end,
+ yaw=function(controller) native(); assert(controller==currentController); yawReads=yawReads+1; return viewYaw end,
  player=function()
   native()
   if not playerAvailable then return nil end
-  return {world={GetFullName=function() return "TestWorld" end},location={X=0,Y=0,Z=0},yaw=90}
+  return {world={GetFullName=function() return "TestWorld" end},controller=currentController,location={X=0,Y=0,Z=0},yaw=90}
  end,
  hud=function() native(); return {},{} end,
  labels=function() native(); labelCount=labelCount+1; return "Shallows", "12:00 PM" end

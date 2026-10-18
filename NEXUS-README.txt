@@ -1,5 +1,5 @@
 Circe's Circular Minimap - Region and Clock
-Version 0.1.4-alpha
+Version 0.1.5-alpha
 
 A smooth circular minimap with region names and a 12-hour in-game clock.
 Press F3 to show or hide it.
